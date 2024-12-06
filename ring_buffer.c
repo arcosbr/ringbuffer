@@ -14,6 +14,21 @@
 
 #include "ring_buffer.h"
 #include <string.h>
+#include <stdint.h>
+
+/* Inline function to calculate the next index in the ring buffer */
+static inline uint32_t ring_buffer_next_index(uint32_t index, uint32_t lenght)
+{
+	return  (index + 1U) % lenght ;
+
+}
+
+/* Inline Function to calculate the previous index in the ring buffer */
+static inline uint32_t ring_buffer_prev_index(uint32_t index, uint32_t lenght)
+{
+	return (index == 0U) ? (lenght - 1U) : (index - 1U);
+}
+
 
 /* Initialize the ring buffer */
 ring_buffer_status_t ring_buffer_init(ring_buffer_t *handle,
@@ -73,8 +88,6 @@ ring_buffer_status_t ring_buffer_destroy(ring_buffer_t *handle)
 ring_buffer_status_t ring_buffer_push(ring_buffer_t *handle,
                                       const void *element)
 {
-    uint32_t next;
-
     if ((handle == NULL) || (element == NULL))
     {
         return RING_BUFFER_INVALID_PARAMS;
@@ -89,40 +102,30 @@ ring_buffer_status_t ring_buffer_push(ring_buffer_t *handle,
     {
         return RING_BUFFER_FULL;
     }
-
-    if (handle->is_empty != 0U)
-    {
-        handle->is_empty = 0U;
-    }
-
+	
     /* Calculate the offset for the head position */
     uint32_t offset = handle->head * handle->element_size;
 
     /* Copy the element into the buffer at the head position */
     (void)memcpy(&handle->buffer[offset], element, handle->element_size);
 
-    next = handle->head + 1U;
+	/* Update the head position*/
+	handle->head = ring_buffer_next_index(handle->head, handle->length);
 
-    if (next >= handle->length)
-    {
-        next = 0U;
-    }
-
-    if (next == handle->tail)
-    {
-        handle->is_full = 1U;
-    }
-
-    handle->head = next;
-
+	/* Check if buffer is now full */
+	if(handle->head == handle->tail)
+	{
+		handle->is_full = 1U ;
+	}
+   	
+	handle->is_empty = 0U ;
+ 
     return RING_BUFFER_OK;
 }
 
 /* Pop an element from the ring buffer */
 ring_buffer_status_t ring_buffer_pop(ring_buffer_t *handle, void *element)
 {
-    uint32_t next;
-
     if ((handle == NULL) || (element == NULL))
     {
         return RING_BUFFER_INVALID_PARAMS;
@@ -144,24 +147,16 @@ ring_buffer_status_t ring_buffer_pop(ring_buffer_t *handle, void *element)
     /* Copy the element from the buffer at the tail position */
     (void)memcpy(element, &handle->buffer[offset], handle->element_size);
 
-    next = handle->tail + 1U;
+	/* Update the tail position */
+	handle->tail = ring_buffer_next_index(handle->tail, handle->length);
 
-    if (next >= handle->length)
-    {
-        next = 0U;
-    }
+	/* Check if buffer is now empty */
+	if (handle->head == handle->tail)	
+	{
+		handle->is_empty = 1U ;
+	}
 
-    if (handle->is_full != 0U)
-    {
-        handle->is_full = 0U;
-    }
-
-    handle->tail = next;
-
-    if (handle->head == handle->tail)
-    {
-        handle->is_empty = 1U;
-    }
+	handle->is_full = 0U ;
 
     return RING_BUFFER_OK;
 }
